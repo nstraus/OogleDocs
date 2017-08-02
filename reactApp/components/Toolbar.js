@@ -4,7 +4,7 @@ import BLOCKS from '../labels/blockLabels';
 import FONT_SIZES from '../labels/fontLabels';
 var FontAwesome = require( 'react-fontawesome' );
 import { CirclePicker } from 'react-color';
-import { RichUtils, convertToRaw } from 'draft-js';
+import { RichUtils, convertToRaw, EditorState, Modifier, SelectionState } from 'draft-js';
 import _ from 'underscore';
 import axios from 'axios';
 
@@ -56,8 +56,23 @@ class Toolbar extends React.Component {
     }
 
     _saveDocument() {
-        const rawDraftContentState = JSON.stringify( convertToRaw( this.props.docEdit.state.editorState.getCurrentContent() ) );
-        axios.post( 'http://localhost:3000/save', {
+        let editorState = this.props.docEdit.state.editorState;
+        let contentState = editorState.getCurrentContent();
+        const selectionState = SelectionState.createEmpty();
+        const entireSelection = selectionState.merge({
+            anchorKey: contentState.getFirstBlock().getKey(),
+            anchorOffset: 0,
+            focusKey: contentState.getLastBlock().getKey(),
+            focusOffset: contentState.getLastBlock().length
+        });
+        console.log('entireSelection', entireSelection);
+        const colors = ['cursorRed', 'cursorGreen', 'cursorBlue', 'cursorPurple', 'cursorYellow', 'cursorOrange'];
+        colors.forEach(color => {
+            contentState = Modifier.removeInlineStyle( contentState, entireSelection, color );
+        });
+        editorState = EditorState.createWithContent(contentState);
+        const rawDraftContentState = JSON.stringify( convertToRaw(this.props.docEdit.state.editorState.getCurrentContent()) );
+        axios.post('http://localhost:3000/save', {
             contentState: rawDraftContentState,
             docId: this.props.docEdit.props.match.params.docid
         } )

@@ -17,6 +17,8 @@ class DocEdit extends React.Component {
             editorState: EditorState.createEmpty(),
             docId: this.props.match.params.docid,
             documentTitle: '',
+            userColor: null,
+            selections: {}
             createModal: false,
             setInterval: "",
             searchTerm: ''
@@ -27,7 +29,7 @@ class DocEdit extends React.Component {
             const rawDraftContentState = JSON.stringify( convertToRaw( editorState.getCurrentContent() ) );
             this.props.socket.emit( 'madeChange', rawDraftContentState );
             const newSelection = editorState.getSelection();
-            if ( newSelection ) {
+            if (newSelection && newSelection.getHasFocus()) {
                 const selectionInfo = {
                     anchorKey: newSelection.getAnchorKey(),
                     anchorOffset: newSelection.getAnchorOffset(),
@@ -116,19 +118,31 @@ class DocEdit extends React.Component {
 
     componentWillMount() {
         var self = this;
-        this.props.socket.emit( 'joinDocument', this.state.docId );
-        this.props.socket.on( 'roomStatus', ( roomStatus ) => {
-            console.log( 'room status', roomStatus );
-        } );
-        this.props.socket.on( 'userColor', ( userColor ) => {
-            console.log( 'userColor', userColor );
-        } );
-        this.props.socket.on( 'changeListener', ( changedDoc ) => {
-            self.updateContentFromSocket( changedDoc );
-        } );
-        this.props.socket.on( 'renderSelection', ( newSelection ) => {
-            console.log( 'newS', newSelection );
+        this.props.socket.emit('joinDocument', this.state.docId);
+        this.props.socket.on('roomStatus', (roomStatus) => {
+            console.log('room status', roomStatus);
+        });
+        this.props.socket.on('userColor', (userColor) => {
+            this.state.userColor = userColor;
+        });
+        this.props.socket.on('changeListener', (changedDoc) => {
+            self.updateContentFromSocket(changedDoc);
+        });
+        this.props.socket.on('renderSelection', (newSelection) => {
+            console.log('newS', newSelection);
+
             const userColor = 'cursor' + newSelection.userColor;
+
+            if (this.state.selections[userColor] ) {
+                const removedState = Modifier.removeInlineStyle(
+                this.state.editorState.getCurrentContent(),
+                this.state.selections[userColor],
+                userColor
+              );
+                this.setState({editorState: EditorState.createWithContent(removedState)});
+
+            }
+
             newSelection = newSelection.ranges;
             const updateSelection = new SelectionState( {
                 anchorKey: newSelection.anchorKey,
@@ -140,7 +154,8 @@ class DocEdit extends React.Component {
             let newEditorState = EditorState.acceptSelection( this.state.editorState, updateSelection );
             newEditorState = EditorState.forceSelection( newEditorState, newEditorState.getSelection() );
             let contentWithCursor = newEditorState.getCurrentContent();
-            console.log( 'userColor', userColor );
+            console.log('userColor', userColor);
+
             contentWithCursor = Modifier.applyInlineStyle(
                 contentWithCursor,
                 updateSelection,
@@ -149,12 +164,15 @@ class DocEdit extends React.Component {
             this.setState( { saveInterval: setInterval( this._saveDocument.bind( this ), 30000 ) } );
             console.log( contentWithCursor );
 
+            this.state.selections[userColor] = updateSelection;
+
             this.setState( { editorState: EditorState.createWithContent( contentWithCursor ) } );
         } );
 
         this.props.socket.on( 'currentState', ( currentState ) => {
             axios.post( "http://localhost:3000/loadDocument", {
                 docId: this.state.docId
+
             } )
             .then( response => {
                 let loadedContentState = convertFromRaw( JSON.parse( response.data.doc.contentState[response.data.doc.contentState.length - 1] ) );
@@ -173,6 +191,7 @@ class DocEdit extends React.Component {
             } );
 
         } );
+
     }
 
     updateContentFromSocket( changedDoc ) {
@@ -191,6 +210,7 @@ class DocEdit extends React.Component {
     }
 
     render() {
+        customStyleMap['cursor' + this.state.userColor] = {};
         const toggleCreate = this.toggleCreate.bind( this );
         return (
             <div>
