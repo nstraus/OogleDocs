@@ -5,8 +5,11 @@ import customStyleMap from '../customMaps/customStyleMap';
 import Toolbar from './Toolbar';
 import extendedBlockRenderMap from '../customMaps/customBlockMap';
 import axios from 'axios';
+import SummaryTool from 'node-summary';
+
 //import SaveModal from './saveModal'
 var needsToSave = false;
+var summ;
 class DocEdit extends React.Component {
     constructor( props ) {
         super( props );
@@ -34,6 +37,9 @@ class DocEdit extends React.Component {
                 };
                 this.props.socket.emit( 'madeSelection', JSON.stringify( selectionInfo ) );
             }
+            //console.log("pRIYA", this.state.editorState.getCurrentContent().contents)
+            console.log("poop",  convertToRaw( this.state.editorState.getCurrentContent() ).blocks[0].text)
+            summarizeText();
         };
         this.focus = () => this.refs.editor.focus();
 
@@ -55,14 +61,26 @@ class DocEdit extends React.Component {
                 contentState: rawDraftContentState,
                 docId: this.state.docId
             } )
-                .then( response => {
-                    console.log( 'Document successfully saved' );
-                } )
-                .catch( err => {
-                    console.log( 'error saving document', err );
-                } );
+            .then( response => {
+                console.log( 'Document successfully saved' );
+            } )
+            .catch( err => {
+                console.log( 'error saving document', err );
+            } );
             needsToSave = false;
         }
+    }
+
+    summarizeText(){
+        SummaryTool.summarize(this.state.documentTitle, convertToRaw( this.state.editorState.getCurrentContent() ).blocks[0].text, function(err, summary) {
+            if(err) console.log("Something went wrong man!");
+            summ = summary;
+            console.log("summARY", summary);
+
+            console.log("Original Length " + (title.length + content.length));
+            console.log("Summary Length " + summary.length);
+            console.log("Summary Ratio: " + (100 - (100 * (summary.length / (title.length + content.length)))));
+        });
     }
 
     search( e ) {
@@ -127,7 +145,7 @@ class DocEdit extends React.Component {
                 contentWithCursor,
                 updateSelection,
                 userColor
-            );
+                );
             this.setState( { saveInterval: setInterval( this._saveDocument.bind( this ), 30000 ) } );
             console.log( contentWithCursor );
 
@@ -138,21 +156,21 @@ class DocEdit extends React.Component {
             axios.post( "http://localhost:3000/loadDocument", {
                 docId: this.state.docId
             } )
-                .then( response => {
-                    let loadedContentState = convertFromRaw( JSON.parse( response.data.doc.contentState[response.data.doc.contentState.length - 1] ) );
-                    if ( currentState ) {
-                        loadedContentState = convertFromRaw( JSON.parse( currentState ) );
-                    } else {
-                        loadedContentState = convertFromRaw( JSON.parse( response.data.doc.contentState[response.data.doc.contentState.length - 1] ) );
-                    }
-                    this.setState( {
-                        editorState: EditorState.createWithContent( loadedContentState ),
-                        documentTitle: response.data.doc.title
-                    } );
-                } )
-                .catch( err => {
-                    console.log( 'error loading document', err );
+            .then( response => {
+                let loadedContentState = convertFromRaw( JSON.parse( response.data.doc.contentState[response.data.doc.contentState.length - 1] ) );
+                if ( currentState ) {
+                    loadedContentState = convertFromRaw( JSON.parse( currentState ) );
+                } else {
+                    loadedContentState = convertFromRaw( JSON.parse( response.data.doc.contentState[response.data.doc.contentState.length - 1] ) );
+                }
+                this.setState( {
+                    editorState: EditorState.createWithContent( loadedContentState ),
+                    documentTitle: response.data.doc.title
                 } );
+            } )
+            .catch( err => {
+                console.log( 'error loading document', err );
+            } );
 
         } );
     }
@@ -176,35 +194,41 @@ class DocEdit extends React.Component {
         const toggleCreate = this.toggleCreate.bind( this );
         return (
             <div>
-                <Modal isOpen={ this.state.createModal } toggle={ toggleCreate } backdrop={ true }>
-                    <ModalHeader toggle={ toggleCreate }>Do you want to save?</ModalHeader>
-                    <ModalBody>
-                        <Button href="#/home" type="submit" onClick={ this._saveDocument.bind( this ) }>Save</Button>
-                        <Button href="#/home" type="submit">Leave without Saving</Button>
-                    </ModalBody>
-                </Modal>
-                <div className="backButton">
-                    <Button onClick={ toggleCreate }>Docs Home</Button>
-                </div>
-                <div>
-                    <h1>{ this.state.documentTitle }</h1>
-                    <p>ID: { this.state.docId }</p>
-                </div>
-                <Toolbar onSaveDocument={ this._saveDocument } docEdit={ this } />
-                <div id='editor' onClick={ this.focus }>
-                    <Editor
-                        customStyleMap={ customStyleMap }
-                        editorState={ this.state.editorState }
-                        onChange={ this.onChange }
-                        ref="editor" blockRenderMap={ extendedBlockRenderMap }
-                    />
-                </div>
-                <div className="buttonLine">
-                    <Input id="search" placeholder="Search" onChange={ this.search.bind( this ) } />
-                    <Button href={ `#/history/${ this.state.docId }` }>Doc History</Button>
-                </div>
+            <div className="outlineBar">
+            Show Outline
+            <div className="outline">
+                {summ}
             </div>
-        );
+            </div>
+            <Modal isOpen={ this.state.createModal } toggle={ toggleCreate } backdrop={ true }>
+            <ModalHeader toggle={ toggleCreate }>Do you want to save?</ModalHeader>
+            <ModalBody>
+            <Button href="#/home" type="submit" onClick={ this._saveDocument.bind( this ) }>Save</Button>
+            <Button href="#/home" type="submit">Leave without Saving</Button>
+            </ModalBody>
+            </Modal>
+            <div className="backButton">
+            <Button onClick={ toggleCreate }>Docs Home</Button>
+            </div>
+            <div>
+            <h1>{ this.state.documentTitle }</h1>
+            <p>ID: { this.state.docId }</p>
+            </div>
+            <Toolbar onSaveDocument={ this._saveDocument } docEdit={ this } />
+            <div id='editor' onClick={ this.focus }>
+            <Editor
+            customStyleMap={ customStyleMap }
+            editorState={ this.state.editorState }
+            onChange={ this.onChange }
+            ref="editor" blockRenderMap={ extendedBlockRenderMap }
+            />
+            </div>
+            <div className="buttonLine">
+            <Input id="search" placeholder="Search" onChange={ this.search.bind( this ) } />
+            <Button href={ `#/history/${ this.state.docId }` }>Doc History</Button>
+            </div>
+            </div>
+            );
     }
 }
 

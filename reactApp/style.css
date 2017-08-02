@@ -72,7 +72,8 @@ h1, p {
 }
 .backButton {
     margin: 10px;
-    position: absolute;
+    display: flex;
+    justify-content: flex-end;
 }
 .toolbar {
     display: flex;
@@ -104,4 +105,30 @@ h1, p {
 
 .yellowHighlight {
     background-color: yellowgreen;
+}
+
+.outline {  
+    display: none;
+    height: 65vh;
+    position: absolute;
+}
+
+.outlineBar {
+    border: solid;
+    height: 40px;
+    width: 120px;
+    position: absolute;
+    
+}
+
+.outlineBar:hover {
+    height: 65vh;
+}
+
+.outlineBar:hover .outline {
+    display: block;  
+}
+
+.outlineBar:hover #editor {
+    width: 75%;
 }
